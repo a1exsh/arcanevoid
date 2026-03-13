@@ -20,52 +20,63 @@
 
 (require sdl3)
 
+(define run? #t)
+
+(define (run!)
+  (set! run? #t))
+
+(define (quit!)
+  (set! run? #f))
+
 (define width 800)
 (define height 600)
 
 (define bx 100)
 (define by 100)
-(define vx 5)
-(define vy 5)
+(define vx0 10)
+(define vy0 -10)
+(define vx 0)
+(define vy 0)
 (define px 400)
 (define py 560)
+(define pvx 0)
 (define dx 0)                           ; last paddle movement dx
-
-(define (reset!)
-  (set! bx 100)
-  (set! by 100)
-  (set! vx 5)
-  (set! vy 5))
-
-(reset!)
+(define g 1e-1)                         ; gravity rate
 
 (define (ball-sits?)
   (= 0 vx vy))
 
-(define (launch-ball!)
-  (set! vx 5)
-  (set! vy -5))
+(define (place-ball-on-paddle!)
+  (set! bx px)
+  (set! by (- py 5))
+  (set! vx 0)
+  (set! vy 0))
 
-(define (move-paddle! x)
-  (set! dx (- x px))
-  (set! px x)
-  (if (ball-sits?)
-      (set! bx (+ bx dx))
-      #f))
+(place-ball-on-paddle!)
+
+(define (launch-ball!)
+  (set! vx vx0)
+  (set! vy vy0))
+
+(define (acc-paddle! a)
+  (set! pvx (+ pvx a)))
 
 (define (handle! ev)
   (match ev
-    [(quit-event) #t]
-    [(key-event 'down 'escape _ _ _) #t]
-    [(mouse-motion-event x _ _ _ _)
-     (move-paddle! x)
-     #f]
-    [(mouse-button-event 'down 'left _ _ _)
-     (if (ball-sits?)
-         (launch-ball!)
-         #f)
-     #f]
-    [_ #f]))
+    [(quit-event) (quit!)]
+    [(key-event 'down 'escape _ _ _) (quit!)]
+    [(key-event 'down 'left _ _ _) (acc-paddle! -1)]
+    [(key-event 'down 'right _ _ _) (acc-paddle! +1)]
+    ;; [(mouse-motion-event x _ _ _ _)
+    ;;  (move-paddle! x)
+    ;;  #f]
+    [(key-event 'down 'space _ _ _)
+     (when (ball-sits?)
+       (launch-ball!))]
+    ;; [(mouse-button-event 'down 'left _ _ _)
+    ;;  ]
+    [_ #f;;(println ev)
+     ]))
 
 (define (render-paddle! ren x y)
   (set-draw-color! ren 255 255 255)
@@ -84,6 +95,8 @@
 (define (move-ball!)
   (set! bx (+ bx vx))
   (set! by (+ by vy))
+  (when (not (ball-sits?))
+    (set! vy (+ vy g)))
   (cond
     [(not (< 0 bx width))
      (set! vx (- vx))]
@@ -95,15 +108,21 @@
      (set! vx (+ vx (/ dx 2)))]
 
     [(< height by)
-     (set! bx px)
-     (set! by (- py 5))
-     (set! vx 0)
-     (set! vy 0)]))
+     (place-ball-on-paddle!)]))
+
+(define (move-paddle!)
+  ;; (set! dx (- x px))
+  (set! px (+ px pvx))
+  (when (ball-sits?)
+      (set! bx (+ bx pvx)))
+  (cond
+    [(not (< 30 px (- width 30)))
+     (set! px (max 30 (min px (- width 30))))
+     (set! pvx (- (/ pvx 2)))]))
 
 (define (move!)
-  (if (ball-sits?)
-      #f
-      (move-ball!))
+  (move-ball!)
+  (move-paddle!)
 
   ; reset dx after each move so it doesn't stick
   (set! dx 0))
@@ -112,16 +131,16 @@
   (with-sdl
     (with-window+renderer "Arcane Void" width height (win ren)
       (let loop ()
-        (define quit?
-          (for/or ([ev (in-events)])
-            (handle! ev)))
+        (for/or ([ev (in-events)])
+          (handle! ev))
         (move!)
-        (unless quit?
+        (when run?
           (render! ren)
           (render-present! ren)
           (delay! 16)
           (loop))))))
 
+(run!)
 (if (equal? '#("-f") (current-command-line-arguments))
     (game)
     (thread game))
