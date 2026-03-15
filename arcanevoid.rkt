@@ -44,6 +44,7 @@
 (define py 560)
 (define pvx 0.0)
 (define g 1e-1)                         ; gravity rate
+(define collision-factor 0.95)          ; velocity left after a collision
 (define acc-left-cool-down  0)
 (define acc-right-cool-down 0)
 (define acc-cool-down-ticks 10)
@@ -124,14 +125,14 @@
     (set! vy (+ vy g)))
   (cond
     [(not (< 0 bx width))
-     (set! vx (- vx))]
-    
+     (set! vx (* collision-factor (- vx)))]
+
     [(or (< by 0)
          (and (< (- px 30) bx (+ px 30))
               (< (- py 10) by (+ py))))
      (unless (or (ball-sits?) (< by 0))
        (set! score (add1 score)))
-     (set! vy (- vy))
+     (set! vy (* collision-factor  (- vy)))
      (unless (ball-sits?)
        (set! vx (+ vx pvx)))]
 
