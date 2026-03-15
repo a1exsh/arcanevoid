@@ -15,10 +15,10 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ;;
-#lang racket                            ; /base
-; TODO: 'require' racket/match
+#lang racket/base
 
-(require sdl3)
+(require racket/match
+         sdl3)
 
 (define run? #t)
 
