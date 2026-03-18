@@ -44,6 +44,7 @@
 (define py 560)
 (define pvx 0.0)
 (define g 1e-1)                         ; gravity rate
+(define a 1e-1)                         ; acceleratin kick of the paddle
 (define collision-factor 0.95)          ; velocity left after a collision
 (define acc-left-cool-down  0)
 (define acc-right-cool-down 0)
@@ -71,16 +72,25 @@
   (match ev
     [(quit-event) (quit!)]
     [(key-event 'down 'escape _ _ _) (quit!)]
-    [(key-event 'down 'left _ _ _)
-     (acc-paddle! -1)
-     (set! acc-left-cool-down acc-cool-down-ticks)]
-    [(key-event 'down 'right _ _ _)
-     (acc-paddle! +1)
-     (set! acc-right-cool-down acc-cool-down-ticks)]
+    ;; [(key-event 'down 'left _ _ _)
+    ;;  (acc-paddle! -1)
+    ;;  (set! acc-left-cool-down acc-cool-down-ticks)]
+    ;; [(key-event 'down 'right _ _ _)
+    ;;  (acc-paddle! +1)
+    ;;  (set! acc-right-cool-down acc-cool-down-ticks)]
     [(key-event 'down 'space _ _ _)
      (when (ball-sits?)
        (launch-ball!))]
     [_ (void)]))
+
+(define (poll!)
+  (cond
+    [(key-pressed? 'left)
+     (acc-paddle! (- a))
+     (set! acc-left-cool-down acc-cool-down-ticks)]
+    [(key-pressed? 'right)
+     (acc-paddle! a)
+     (set! acc-right-cool-down acc-cool-down-ticks)]))
 
 (define (render-paddle! ren x y)
   (define (cool-down-alpha x)
@@ -168,6 +178,7 @@
       (let loop ()
         (for/or ([ev (in-events)])
           (handle! ev))
+        (poll!)
         (move!)
         (when run?
           (render! ren)
