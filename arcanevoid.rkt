@@ -34,15 +34,15 @@
 (define width  800)
 (define height 600)
 
-(define bx 100)
+(define bx 100)                         ; ball: x and y position
 (define by 100)
-(define vx0 +0.5)
+(define vx0 +0.5)                       ; ball's initial velocity
 (define vy0 -10.0)
-(define vx 0)                           ; exact for detecting that ball "sits"
-(define vy 0)
-(define px 400)
+(define vx 0)                           ; ball's velocity
+(define vy 0)                           ; exact for detecting that ball "sits"
+(define px 400)                         ; paddle's position
 (define py 560)
-(define pvx 0.0)
+(define pvx 0.0)                        ; paddle's horizontal velocity
 (define g 1e-1)                         ; gravity rate
 (define a 1e-1)                         ; acceleratin kick of the paddle
 (define collision-factor 1.00)          ; velocity left after a collision
