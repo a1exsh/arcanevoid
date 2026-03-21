@@ -31,6 +31,35 @@
 (define score 0)
 (define hiscore 0)
 
+;; a cyclic buffer with the current frame number modulo length as the pointer
+;; the bigger the buffer, the more accurate the average is
+(define last-rendered-frames-ticks (make-vector 200))
+(define current-frame-number 0)
+
+(define (record-frame!)
+  (vector-set! last-rendered-frames-ticks
+               (modulo current-frame-number
+                       (vector-length last-rendered-frames-ticks))
+               (current-ticks))
+  (set! current-frame-number (add1 current-frame-number)))
+
+(define (fps)
+  (define n (vector-length last-rendered-frames-ticks))
+
+  (define earliest-frame-ticks
+    (vector-ref last-rendered-frames-ticks (modulo current-frame-number n)))
+
+  (define latest-frame-ticks
+    (vector-ref last-rendered-frames-ticks (modulo (sub1 current-frame-number) n)))
+
+  (define avg-ticks-per-frame
+    (/ (- latest-frame-ticks earliest-frame-ticks)
+       n))
+
+  (if (= 0 avg-ticks-per-frame)
+      0.0
+      (/ 1000.0 avg-ticks-per-frame)))
+
 (define width  800)
 (define height 600)
 
@@ -120,13 +149,19 @@
   (render-debug-text! ren 0 42 (format "vy: ~s" vy))
   (render-debug-text! ren 0 56 (format "pvx: ~s" pvx)))
 
+(define (render-fps! ren)
+  (set-draw-color! ren 255 255 255)
+  (let ([text (format "FPS: ~s" (inexact->exact (round (fps))))])
+    (render-debug-text! ren (- width (* 8 (string-length text))) 0 text)))
+
 (define (render! ren)
   (set-draw-color! ren 0 0 0)
   (render-clear! ren)
   (render-paddle! ren px py)
   (render-ball! ren bx by)
   (render-score! ren)
-  (render-params! ren))
+  (render-params! ren)
+  (render-fps! ren))
 
 (define (move-ball-step! n dx dy)
   (set! bx (+ bx dx))
@@ -198,6 +233,7 @@
 (define (game)
   (with-sdl
     (with-window+renderer "Arcane Void" width height (win ren)
+      (set-render-vsync! ren 1)
       (set-blend-mode! ren 'blend)
       (let loop ()
         (for/or ([ev (in-events)])
@@ -207,7 +243,8 @@
         (when run?
           (render! ren)
           (render-present! ren)
-          (delay! 16)
+          ;; (delay! 16)                   ; when not using vsync
+          (record-frame!)
           (loop))))))
 
 (run!)
