@@ -45,7 +45,7 @@
 (define pvx 0.0)
 (define g 1e-1)                         ; gravity rate
 (define a 1e-1)                         ; acceleratin kick of the paddle
-(define collision-factor 0.95)          ; velocity left after a collision
+(define collision-factor 1.00)          ; velocity left after a collision
 (define acc-left-cool-down  0)
 (define acc-right-cool-down 0)
 (define acc-cool-down-ticks 10)
@@ -128,33 +128,56 @@
   (render-score! ren)
   (render-params! ren))
 
-(define (move-ball!)
-  (set! bx (+ bx vx))
-  (set! by (+ by vy))
-  (unless (ball-sits?)
-    (set! vy (+ vy g)))
+(define (move-ball-step! n dx dy)
+  (set! bx (+ bx dx))
+  (set! by (+ by dy))
   (cond
     [(not (< 0 bx width))
-     (set! vx (* collision-factor (- vx)))]
+     (set! bx (max 0 (min bx (sub1 width))))
+     (set! vx (* collision-factor (- vx)))
+     (values (- dx) dy)]
 
     [(or (< by 0)
          (and (< (- px 30) bx (+ px 30))
               (< (- py 10) by (+ py))))
-     (unless (or (ball-sits?) (< by 0))
-       (set! score (add1 score)))
-     (set! vy (* collision-factor  (- vy)))
-     (unless (ball-sits?)
-       (set! vx (+ vx pvx)))]
+     (if (< by 0)
+         (set! by 0)
+         (begin
+           (set! by (- py 10))
+           (set! score (add1 score))))
+
+     (set! vx (+ vx pvx))
+     (set! vy (* collision-factor (- vy)))
+     (values (+ dx (/ pvx n))
+             (- dy))]
 
     [(< height by)
      (set! hiscore (max hiscore score))
      (set! score 0)
-     (place-ball-on-paddle!)]))
+     (place-ball-on-paddle!)
+     (values 0 0)]
+
+    [else (values dx dy)]))
+
+(define (move-ball!)
+  (let* ([mvxy (max (abs vx) (abs vy))]
+         [n (ceiling (/ mvxy 5))]
+         [dx (/ vx n)]
+         [dy (/ vy n)])
+    (let loop ([i n] [dx dx] [dy dy])
+      (unless (or (= i 0)
+                  (= 0 dx dy))
+        (let-values ([(dx dy) (move-ball-step! n dx dy)])
+          (loop (sub1 i) dx dy)))))
+
+  (unless (ball-sits?)
+    ;; apply gravity
+    (set! vy (+ vy g))))
 
 (define (move-paddle!)
   (set! px (+ px pvx))
   (when (ball-sits?)
-      (set! bx (+ bx pvx)))
+    (set! bx (+ bx pvx)))
   (cond
     [(not (< 30 px (- width 30)))
      (set! px (max 30 (min px (- width 30))))
@@ -167,7 +190,8 @@
     (set! acc-right-cool-down (sub1 acc-right-cool-down))))
 
 (define (move!)
-  (move-ball!)
+  (unless (ball-sits?)
+    (move-ball!))
   (move-paddle!)
   (cool-down-acc!))
 
