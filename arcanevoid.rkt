@@ -96,7 +96,7 @@
 
 (define (place-ball-on-paddle!)
   (set! bx px)
-  (set! by (- py 5))
+  (set! by (- py 10))
   (set! vx 0)
   (set! vy 0))
 
