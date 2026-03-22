@@ -28,6 +28,11 @@
 (define (quit!)
   (set! run? #f))
 
+(define pause? #f)
+
+(define (toggle-pause!)
+  (set! pause? (not pause?)))
+
 (define score 0)
 (define hiscore 0)
 
@@ -101,15 +106,11 @@
   (match ev
     [(quit-event) (quit!)]
     [(key-event 'down 'escape _ _ _) (quit!)]
-    ;; [(key-event 'down 'left _ _ _)
-    ;;  (acc-paddle! -1)
-    ;;  (set! acc-left-cool-down acc-cool-down-ticks)]
-    ;; [(key-event 'down 'right _ _ _)
-    ;;  (acc-paddle! +1)
-    ;;  (set! acc-right-cool-down acc-cool-down-ticks)]
+    [(key-event 'down 'p _ _ _) (toggle-pause!)]
     [(key-event 'down 'space _ _ _)
-     (when (ball-sits?)
-       (launch-ball!))]
+     (unless pause?
+       (when (ball-sits?)
+         (launch-ball!)))]
     [_ (void)]))
 
 (define (poll!)
@@ -154,6 +155,17 @@
   (let ([text (format "FPS: ~s" (inexact->exact (round (fps))))])
     (render-debug-text! ren (- width (* 8 (string-length text))) 0 text)))
 
+(define (render-paused! ren)
+  (define text "-- PAUSED --")
+  (define text-length (string-length text))
+  (define text-width (* 8 text-length))
+  (define text-height 8)
+  (set-draw-color! ren 255 255 255)
+  (render-debug-text! ren
+                      (/ (- width text-width) 2)
+                      (/ (- height text-height) 2)
+                      text))
+
 (define (render! ren)
   (set-draw-color! ren 0 0 0)
   (render-clear! ren)
@@ -161,7 +173,9 @@
   (render-ball! ren bx by)
   (render-score! ren)
   (render-params! ren)
-  (render-fps! ren))
+  (render-fps! ren)
+  (when pause?
+    (render-paused! ren)))
 
 (define (move-ball-step! n dx dy)
   (set! bx (+ bx dx))
@@ -238,8 +252,9 @@
       (let loop ()
         (for/or ([ev (in-events)])
           (handle! ev))
-        (poll!)
-        (move!)
+        (unless pause?
+          (poll!)
+          (move!))
         (when run?
           (render! ren)
           (render-present! ren)
