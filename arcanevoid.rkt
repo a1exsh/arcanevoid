@@ -83,6 +83,13 @@
 (define acc-left-cool-down  0)
 (define acc-right-cool-down 0)
 (define acc-cool-down-ticks 10)
+(define speed 1.0)                      ; game speed
+
+(define (speed-up!)
+  (set! speed (+ speed 0.1)))
+
+(define (slow-down!)
+  (set! speed (max 0.1 (- speed 0.1))))
 
 (define (ball-sits?)
   (= 0 vx vy))
@@ -99,14 +106,13 @@
   (set! vx (+ pvx vx0))
   (set! vy vy0))
 
-(define (acc-paddle! a)
-  (set! pvx (+ pvx a)))
-
 (define (handle! ev)
   (match ev
     [(quit-event) (quit!)]
     [(key-event 'down 'escape _ _ _) (quit!)]
     [(key-event 'down 'p _ _ _) (toggle-pause!)]
+    [(key-event 'down 'left-bracket _ _ _) (slow-down!)]
+    [(key-event 'down 'right-bracket _ _ _) (speed-up!)]
     [(key-event 'down 'space _ _ _)
      (unless pause?
        (when (ball-sits?)
@@ -116,10 +122,8 @@
 (define (poll!)
   (cond
     [(key-pressed? 'left)
-     (acc-paddle! (- a))
      (set! acc-left-cool-down acc-cool-down-ticks)]
     [(key-pressed? 'right)
-     (acc-paddle! a)
      (set! acc-right-cool-down acc-cool-down-ticks)]))
 
 (define (render-paddle! ren x y)
@@ -140,9 +144,11 @@
   (fill-rect! ren (- x 5) (- y 5) 10 10))
 
 (define (render-score! ren)
+  (define (round-score sc)
+    (/ (round (* 100 sc)) 100.0))
   (set-draw-color! ren 255 255 255)
-  (render-debug-text! ren 0 0 (format "High Score: ~s" hiscore))
-  (render-debug-text! ren 0 12 (format "Score: ~s" score)))
+  (render-debug-text! ren 0 0 (format "High Score: ~s" (round-score hiscore)))
+  (render-debug-text! ren 0 12 (format "Score: ~s" (round-score score))))
 
 (define (render-params! ren)
   (set-draw-color! ren 255 255 255)
@@ -151,9 +157,19 @@
   (render-debug-text! ren 0 56 (format "pvx: ~s" pvx)))
 
 (define (render-fps! ren)
+  (define text (format "FPS: ~s" (inexact->exact (round (fps)))))
+  (define text-length (string-length text))
+  (define text-width (* 8 text-length))
   (set-draw-color! ren 255 255 255)
-  (let ([text (format "FPS: ~s" (inexact->exact (round (fps))))])
-    (render-debug-text! ren (- width (* 8 (string-length text))) 0 text)))
+  (render-debug-text! ren (- width text-width) 0 text))
+
+(define (render-game-speed! ren)
+  (define rounded-speed (/ (round (* 10 speed)) 10.0))
+  (define text (format "speed: ~s" rounded-speed))
+  (define text-length (string-length text))
+  (define text-width (* 8 text-length))
+  (set-draw-color! ren 255 255 255)
+  (render-debug-text! ren (- width text-width) 12 text))
 
 (define (render-paused! ren)
   (define text "-- PAUSED --")
@@ -174,6 +190,7 @@
   (render-score! ren)
   (render-params! ren)
   (render-fps! ren)
+  (render-game-speed! ren)
   (when pause?
     (render-paused! ren)))
 
@@ -193,7 +210,7 @@
          (set! by 0)
          (begin
            (set! by (- py 10))
-           (set! score (add1 score))))
+           (set! score (+ score speed))))
 
      (set! vx (+ vx pvx))
      (set! vy (* collision-factor (- vy)))
@@ -209,40 +226,52 @@
     [else (values dx dy)]))
 
 (define (move-ball!)
-  (let* ([mvxy (max (abs vx) (abs vy))]
-         [n (ceiling (/ mvxy 5))]
-         [dx (/ vx n)]
-         [dy (/ vy n)])
-    (let loop ([i n] [dx dx] [dy dy])
-      (unless (or (= i 0)
-                  (= 0 dx dy))
-        (let-values ([(dx dy) (move-ball-step! n dx dy)])
-          (loop (sub1 i) dx dy)))))
+  (define svx (* speed vx))
+  (define svy (* speed vy))
+  (define msvxy (max (abs svx) (abs svy)))
+  (define n (ceiling (/ msvxy 5.0)))
+  (define sdx (/ svx n))
+  (define sdy (/ svy n))
+
+  (let loop ([i n] [dx sdx] [dy sdy])
+    (unless (or (= i 0)
+                (= 0 dx dy))
+      (let-values ([(dx dy) (move-ball-step! n dx dy)])
+        (loop (sub1 i) dx dy))))
 
   (unless (ball-sits?)
     ;; apply gravity
-    (set! vy (+ vy g))))
+    (set! vy (+ vy (* speed g)))))
 
 (define (move-paddle!)
-  (set! px (+ px pvx))
-  (when (ball-sits?)
-    (set! bx (+ bx pvx)))
-  (cond
-    [(not (< 30 px (- width 30)))
-     (set! px (max 30 (min px (- width 30))))
-     (set! pvx (- (/ pvx 2)))]))
+  (define spvx (* speed pvx))
+  (define (acc-paddle! acc)
+    (set! pvx (+ pvx (* speed acc))))
 
-(define (cool-down-acc!)
+  (set! px (+ px spvx))
+  (when (ball-sits?)
+    (set! bx (+ bx spvx)))
+
+  ;; check collision against window edges
+  (unless (< 30 px (- width 30))
+    (set! px (max 30 (min px (- width 30))))
+    (set! pvx (- (/ pvx 2))))
+
+  ;; apply thrusters acceleration
   (when (positive? acc-left-cool-down)
+    (when (= acc-left-cool-down acc-cool-down-ticks)
+      (acc-paddle! (- a)))
     (set! acc-left-cool-down (sub1 acc-left-cool-down)))
+
   (when (positive? acc-right-cool-down)
+    (when (= acc-right-cool-down acc-cool-down-ticks)
+      (acc-paddle! a))
     (set! acc-right-cool-down (sub1 acc-right-cool-down))))
 
 (define (move!)
   (unless (ball-sits?)
     (move-ball!))
-  (move-paddle!)
-  (cool-down-acc!))
+  (move-paddle!))
 
 (define (game)
   (with-sdl
