@@ -89,7 +89,7 @@
   (set! speed (+ speed 0.1)))
 
 (define (slow-down!)
-  (set! speed (max 0.1 (- speed 0.1))))
+  (set! speed (- speed 0.1)))
 
 (define (ball-sits?)
   (= 0 vx vy))
@@ -230,14 +230,13 @@
   (define svy (* speed vy))
   (define msvxy (max (abs svx) (abs svy)))
   (define n (ceiling (/ msvxy 5.0)))
-  (define sdx (/ svx n))
-  (define sdy (/ svy n))
 
-  (let loop ([i n] [dx sdx] [dy sdy])
-    (unless (or (= i 0)
-                (= 0 dx dy))
-      (let-values ([(dx dy) (move-ball-step! n dx dy)])
-        (loop (sub1 i) dx dy))))
+  (unless (= n 0)
+    (let loop ([i n] [dx (/ svx n)] [dy (/ svy n)])
+      (unless (or (= i 0)
+                  (= 0 dx dy))
+        (let-values ([(dx dy) (move-ball-step! n dx dy)])
+          (loop (sub1 i) dx dy)))))
 
   (unless (ball-sits?)
     ;; apply gravity
